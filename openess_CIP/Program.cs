@@ -1,13 +1,10 @@
 ﻿using Siemens.Engineering;
+using Siemens.Engineering.Cax;
 using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace openess_CIP
 {
@@ -15,42 +12,66 @@ namespace openess_CIP
     {
         static void Main(string[] args)
         {
-            string projectPath = @"C:\Users\Siemens\Documents\Automation\CIP\CIP V1.2_V18\CIP V1.2_V18.ap18";
-            string CICIP_csPFolder = @"C:\tmp";
+            string projectPath =
+                @"C:\Users\Siemens\Documents\Automation\CIP\CIP V1.2_V18\CIP V1.2_V18.ap18";
 
-            using (var tiaPortal = new TiaPortal(TiaPortalMode.WithUserInterface)) 
+            string exportFolder = @"C:\tmp";
+
+            try
             {
-                var project = tiaPortal.Projects.Open(new FileInfo(projectPath));
-                PlcSoftware plcSoftware = FindPlcSoftware(project);
+                Directory.CreateDirectory(exportFolder);
 
-                if (plcSoftware == null) 
+                using (var tiaPortal =
+                    new TiaPortal(TiaPortalMode.WithUserInterface))
                 {
-                    Console.WriteLine("No PLC Software Found");
-                    return;
-                }
-                                 
-                
-            }
+                    Console.WriteLine("Opening project...");
 
-        }
-        private static PlcSoftware FindPlcSoftware(Project project) 
-        {
-            foreach (Device device in project.Devices) 
-            {
-                foreach (DeviceItem deviceItem in device.DeviceItems) 
-                {
-                    var softwareContainer = deviceItem.GetService<SoftwareContainer>();
-                    if (softwareContainer?.Software is PlcSoftware plcSoftware)
+                    Project project = tiaPortal.Projects.Open(
+                        new FileInfo(projectPath));
+
+                    // Get the CAx export/import service FROM THE PROJECT.
+                    CaxProvider caxProvider =
+                        project.GetService<CaxProvider>();
+
+                    if (caxProvider == null)
                     {
-                        return plcSoftware;
+                        throw new Exception(
+                            "CaxProvider is unavailable for this project.");
                     }
+
+                    FileInfo amlFile = new FileInfo(
+                        Path.Combine(
+                            exportFolder,
+                            "CIP_cs_HardwareNetwork.aml"));
+
+                    FileInfo logFile = new FileInfo(
+                        Path.Combine(
+                            exportFolder,
+                            "CIP_cs_HardwareNetwork.log"));
+
+                    Console.WriteLine(
+                        "Exporting hardware and network data...");
+
+                    // Export all project CAx data: devices, modules,
+                    // networks, IO systems, configured interfaces, etc.
+                    caxProvider.Export(project, amlFile, logFile);
+
+                    Console.WriteLine("CAx export finished.");
+                    Console.WriteLine("AML: " + amlFile.FullName);
+                    Console.WriteLine("Log: " + logFile.FullName);
+
+                    Console.WriteLine("Press any key to close.");
+                    Console.ReadKey();
+
+                    project.Close();
                 }
             }
-            return null;
+            catch (Exception ex)
+            {
+                Console.WriteLine("CAx export failed:");
+                Console.WriteLine(ex.Message);
+                Console.ReadKey();
+            }
         }
     }
-
-
 }
-
-
